@@ -1,0 +1,14 @@
+/home/deland-admin/Dropbox/tACS-MI/f1_data/pre/Subject_012_tACSMI/Subject_012_tACSMI_Session_001/tACSMI_Online_Visual//Subject_012_RiemanntACSMI_Online_pre_s001_r002_2023_03_28_142335.gdf 
+ExperimentConfigureTime 2.000000
+fixationCrossTime 2.000000
+cueTime 1.500000
+timeout 7.000000
+taskTime 5.000000
+resultTime 2.000000
+restTime 1.500000
+detectionThresholdLH 0.600000
+detectionThresholdRH 0.600000
+nTrials 10.000000
+nHitsRightHand 5
+nHitsLeftHand 3
+evidenceAccumulation 0.950000

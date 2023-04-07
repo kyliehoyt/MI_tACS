@@ -1,0 +1,11 @@
+/home/deland-admin/Dropbox/tACS-MI/f1_data/pre/Subject_016_tACSMI/Subject_016_tACSMI_Session_001/tACSMI_Offline_Visual//Subject_016_RiemanntACSMI_Offline_pre_s001_r004_2023_03_30_142633.gdf ExperimentConfigureTime 2.000000
+fixationCrossTime 2.000000
+cueTime 1.500000
+timeout 7.000000
+taskTime 5.000000
+resultTime 2.000000
+restTime 1.500000
+detectionThresholdLH 0.200000
+detectionThresholdRH 0.260000
+nTrials 10.000000
+
