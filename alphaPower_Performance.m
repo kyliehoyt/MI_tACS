@@ -44,3 +44,12 @@ function [accuracy, timeout_rate] = compute_performance(subjects, fs)
         end
     end
 end
+
+% function to see if there is a statistically significant difference in CDA and TO before and after
+% tACS
+
+% function to compute the absolute alpha power: look at paper, see how to
+% take out 1/f noise to subtract the unknown baseline
+
+% function to compute correlation absolute alpha power and CDA
+
