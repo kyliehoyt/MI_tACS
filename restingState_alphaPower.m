@@ -12,7 +12,6 @@ fs = Subject_12.Pre.restingState.run.header.SampleRate;
 % tRNS_Subjects = Subject_12;
 % tACS_Subjects = [Subject_16, Subject_17];
 All_Subjects = [Subject_12, Subject_16, Subject_17];
-Some_Subjects = [Subject_12, Subject_16];
 
 % Global variables
 global chan_map
@@ -84,10 +83,11 @@ end
 %% Method using fft and two-way anova (from paper)
 function mean_alpha_power = meanAlphaPower(segment, fs, f_band)
     L = size(segment, 1);
-    freq_dom = fft(segment, L, 1);
-    two_sided = abs(freq_dom/L).^2;
-    single_sided = two_sided(1:L/2+1, :);
-    f = fs*(0:(L/2))/L;
+%     freq_dom = fft(segment, L, 1);
+%     two_sided = abs(freq_dom/L).^2;
+%     single_sided = two_sided(1:L/2+1, :);
+%     f = fs*(0:(L/2))/L;
+    %[single_sided, f] = pwelch(period(10*fs:end-10*fs,:), fs, fs/2, 1:50, fs);
     single_sided_alpha = single_sided(find(f==f_band(1),1):find(f==f_band(2),1), :);
     mean_alpha_power = mean(single_sided_alpha, 1);
 end
