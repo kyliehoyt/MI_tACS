@@ -7,6 +7,8 @@ Subject_12 = load('Subj012.mat', 'sub').sub;
 Subject_16 = load('Subj016.mat', 'sub').sub;
 Subject_17 = load('Subj017.mat', 'sub').sub;
 fs = Subject_12.Pre.restingState.run.header.SampleRate;
+global chan_map
+chan_map = string(Subject_12.Pre.restingState.run.header.Label(1:32));
 
 tRNS_Subjects = Subject_12;
 tACS_Subjects = [Subject_16, Subject_17];
@@ -20,14 +22,12 @@ All_Subjects = cleanSubjects(All_Subjects, fs, 4, [1 50]);
 
 %% Compute Absolute Alpha Power
 [ffts, f] = getSubjectFFTs(All_Subjects, fs);
-test_fft = 10*log(ffts(3).Pre(:, 15));
-
 
 D = fittype('a+b/f.^c','dependent', {'D'}, 'independent', {'f'}, 'coefficients', {'a', 'b', 'c'});
-fo = fitoptions('StartPoint', [0, 0, 0], 'Method', 'NonlinearLeastSquares', 'Lower', [0, 0, 0], 'Upper', [5, 5, 5]);
-fitobject = fit(f, test_fft, D, fo);
-plot(fitobject, f, test_fft)
-%plotFFT(f, test_fft)
+C3 = map_chan("C3");
+C4 = map_chan("C4");
+[C3_baselines, C3_alpha_power, ~, ~] = fitBaselines(ffts, f, D, C3, [7, 7; 4, 4; 7, 7], [29, 29; 32, 30; 25, 28]);
+[C4_baselines, C4_alpha_power, ~, ~] = fitBaselines(ffts, f, D, C4, [8, 8; 3, 5; 7, 7], [28, 30; 32, 32; 25, 25]);
 
 
 %% Functions for Performance
@@ -63,8 +63,8 @@ function [accuracy, timeout_rate] = compute_performance(subjects, fs)
     end
 end
 
-function plotFFT(f, fft)
-    plot(f,10*log(fft)) 
+function plotFFT_dB(f, fft_dB)
+    plot(f,fft_dB) 
     title("Single-Sided Power Spectrum")
     xlabel("f (Hz)")
     ylabel("Power (dB)")
@@ -83,17 +83,93 @@ function [subject_FFT, f] = getSubjectFFTs(subjects, fs)
             session = sessions{sess};
             period = getfield(subjects, {sub}, session, 'restingState', 'run', 'eeg');
             [pxx, f] = pwelch(period(10*fs:end-10*fs,:), fs, fs/2, 1:50, fs); % middle 40 seconds of resting period
-            subject_FFT = setfield(subject_FFT, {sub}, session, pxx); % 1 second segments
+            subject_FFT = setfield(subject_FFT, {sub}, session, 10*log(pxx)); % 1 second segments
         end
     end
+end
+
+
+% function to compute the absolute alpha power: look at paper, see how to
+% take out 1/f noise to subtract the unknown baseline
+function [baselines, absolute_alpha_power, lower_a, upper_b] = fitBaselines(ffts, f, model, ch_num, lower_a, upper_b)
+    n_sub = length(ffts);
+    sessions = {'Pre', 'Post'};
+    n_sess = length(sessions);
+    c = cell(n_sess, n_sub);
+    baselines = cell2struct(c, sessions);
+    absolute_alpha_power = zeros(n_sub, n_sess);
+    fo = fitoptions('StartPoint', [-30, 150, 1], 'Method', 'NonlinearLeastSquares');
+    subject_names = ["12", "16", "17"];
+    for sub = 1:n_sub
+        figure();
+        ax = subplot(1, 2, 1);
+        for sess = 1:n_sess
+            hold off
+            session = sessions{sess};
+            full_fft = getfield(ffts, {sub}, session);
+            ch_fft = full_fft(:, ch_num); % only 1 channel
+            % get bounds
+            if nargin<=4
+                psd_fig = figure();
+                plotFFT_dB(f, ch_fft)
+                lower_a(sub, sess) = input("Enter the lower frequency of the alpha peak: ");
+                upper_b(sub, sess) = input("Enter the upper frequency of the beta peak: ");
+                close(psd_fig);
+            end
+            % apply bounds
+            fitting_fft = vertcat(ch_fft(1:lower_a(sub, sess)), ch_fft(upper_b(sub, sess):end));
+            fitting_f = vertcat(f(1:lower_a(sub, sess)), f(upper_b(sub, sess):end));
+            % fit curve to get baseline
+            fitobject = fit(fitting_f, fitting_fft, model, fo);
+            baselines = setfield(baselines, {sub}, session, fitobject);
+            % absolute alpha power
+            alpha_fft = ch_fft(lower_a(sub, sess):13);
+            [alpha_peak, idx] = max(alpha_fft);
+            baseline_at_peak = fitobject(idx+lower_a(sub, sess)-1);
+            absolute_alpha_power(sub, sess) = alpha_peak - baseline_at_peak;
+            % plot
+            subplot(ax);
+            subplot(1, 2, sess);
+            plot(fitobject, f, ch_fft);
+            hold on
+            xlin(idx+lower_a(sub, sess)-1, string(absolute_alpha_power(sub, sess)), baseline_at_peak, alpha_peak, alpha_peak);
+            title(session + " Stimulation")
+            xlabel("f (Hz)")
+            ylabel("Power (dB)")
+            xlim([0 50])
+            legend({'PSD', 'Baseline'})
+        end
+        sgtitle(map_chan(ch_num) + " PSD and Baseline Noise of Subject " + subject_names(sub))
+    end
+end
+
+function chan_output = map_chan(chan_input)
+    global chan_map
+    chan_output = zeros(length(chan_input), 1);
+    if isa(chan_input, 'string')
+        for ch = 1:length(chan_input)
+            chan_output(ch) = find(contains(chan_map, chan_input(ch)));
+        end
+    else
+        chan_output = chan_map(chan_input);
+    end
+end           
+
+function [hl,ht] = xlin(x,txt,ylo,yhi,ytxt) 
+% Documentation: 
+%   x       = x-Position
+%   txt     = Text String
+%   ylo     = Low y-Value (Start)
+%   yhi     = High y-Value (End)
+%   ytxt    = Text Starting Position
+hl = plot([x x],[ylo yhi],'DisplayName',txt, 'LineWidth',1);
+ht = text(x,ytxt, txt, 'Horiz','left', 'Vert','bottom');
 end
 
 
 % function to see if there is a statistically significant difference in CDA and TO before and after
 % tACS
 
-% function to compute the absolute alpha power: look at paper, see how to
-% take out 1/f noise to subtract the unknown baseline
 
 % function to compute correlation absolute alpha power and CDA
 
