@@ -14,8 +14,8 @@ function subjects = cleanSubjects(subjects, fs, filter_order, filter_band)
                 for i_run = 1:n_run
                     run = getfield(subjects, {i_sub}, session_time, session_type, 'run', {i_run}, 'eeg');
                     trimmed_run = trimRun(run, n_chan);
-                    %time_trimmed_run = butter_filt(trimmed_run, fs, filter_order, [filter_band(1) filter_band(2)]);
-                    space_time_trimmed_run = CAR_filt(trimmed_run);
+                    time_trimmed_run = butter_filt(trimmed_run, fs, filter_order, [filter_band(1) filter_band(2)]);
+                    space_time_trimmed_run = CAR_filt(time_trimmed_run);
                     subjects = setfield(subjects, {i_sub}, session_time, session_type, 'run', {i_run}, 'eeg', space_time_trimmed_run);
                 end
             end
