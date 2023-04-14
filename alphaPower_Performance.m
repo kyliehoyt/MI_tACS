@@ -1,5 +1,5 @@
 clear
-close all
+%close all
 clc
 
 %% Load Subject Data
@@ -15,7 +15,7 @@ tACS_Subjects = [Subject_16, Subject_17];
 All_Subjects = [Subject_12, Subject_16, Subject_17];
 
 % Preprocessing
-All_Subjects = cleanSubjects(All_Subjects, fs, 4, [1 50]);
+All_Subjects = cleanSubjects(All_Subjects, fs, 0, [1 100]);
 
 %% Compute Performance Metrics
 [all_perf,all_to] = compute_performance(All_Subjects, fs);

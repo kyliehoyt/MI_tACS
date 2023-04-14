@@ -13,7 +13,7 @@ load("ch32Locations.mat");
 % tRNS_Subjects = Subject_12;
 % tACS_Subjects = [Subject_16, Subject_17];
 All_Subjects = [Subject_12, Subject_16, Subject_17];
-All_Subjects = cleanSubjects(All_Subjects, fs, 4, [1 50]);
+All_Subjects = cleanSubjects(All_Subjects, fs, 0, [1 50]);
 
 % Global variables
 global chan_map
@@ -22,7 +22,7 @@ chan_map = string(Subject_12.Pre.restingState.run.header.Label(1:32));
 %% fft and anova method
 norm_rs_alpha = buildPowerTable(All_Subjects, fs, {'tRNS', 'tACS', 'tACS'});
 [aov_results, signif_chans] = rsPowerAOV(norm_rs_alpha);
-plot_chan = map_chan(["CP1", "C4"]);
+plot_chan = map_chan(["C3", "C4"]);
 createPowerBarPlot(norm_rs_alpha, plot_chan);
 createTopoplots(norm_rs_alpha, ch32Locations);
 
@@ -42,7 +42,7 @@ function rs_alpha_power = buildPowerTable(subjects, fs, treatment_labels)
             period = getfield(subjects, {sub}, session, 'restingState', 'run', 'eeg');
             period = trimRun(period, n_chan);
             [pxx, ~] = pwelch(period(10*fs:end-10*fs,:), fs, fs/2, 1:50, fs);
-            mean_alpha_powers = mean(pxx(8:12, :), 1);
+            mean_alpha_powers = sum(pxx(8:12, :), 1);
             element = (sub-1)*n_sess + sess;
             segment_means(element, :) = mean_alpha_powers;
             treatment{element, 1} = treatment_labels{sub};
@@ -73,10 +73,11 @@ function [aov_results, signif_chans] = rsPowerAOV(power_struct)
 end
 
 function power_struct = normalizeAlphaPower(power_struct)
-    tRNS = cellfun(@(m)isequal(m,"tRNS"),power_struct.treatment);
     Pre = cellfun(@(m)isequal(m,"Pre"),power_struct.time);
-    pre_tRNS_powers = power_struct.values(tRNS & Pre, :);
-    power_struct.values = power_struct.values./pre_tRNS_powers.*100;
+    Post = cellfun(@(m)isequal(m,"Post"),power_struct.time);
+    pre_powers = power_struct.values(Pre, :);
+    power_struct.values(Post,:) = power_struct.values(Post,:)./pre_powers.*100;
+    power_struct.values(Pre,:) = power_struct.values(Pre,:)./pre_powers.*100;
 end
 
 
@@ -119,9 +120,13 @@ function createTopoplots(power_struct, ch32Locations)
     tACSselect = cellfun(@(m)isequal(m,"tACS"),power_struct.treatment);
     preselect = cellfun(@(m)isequal(m,"Pre"),power_struct.time);
     postselect = cellfun(@(m)isequal(m,"Post"),power_struct.time);
-    maplim = [0 1500];
+    maplim = [50 200];
     figure();
-    t = tiledlayout(1,3, 'TileSpacing','compact');
+    t = tiledlayout(1,4, 'TileSpacing','compact');
+    nexttile;
+    pre_tRNS = mean(power_struct.values(tRNSselect & preselect, :), 1);
+    topoplot(pre_tRNS, ch32Locations, 'maplimits', maplim);
+    title("Pre tRNS", "FontSize",13)
     nexttile;
     post_tRNS = mean(power_struct.values(tRNSselect & postselect, :), 1);
     topoplot(post_tRNS, ch32Locations, 'maplimits', maplim);
