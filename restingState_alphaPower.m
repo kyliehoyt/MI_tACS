@@ -1,5 +1,5 @@
 clear
-close all
+%close all
 clc
 %% Load subject data
 Subject_12 = load('Subj012.mat', 'sub').sub;
@@ -20,16 +20,16 @@ global chan_map
 chan_map = string(Subject_12.Pre.restingState.run.header.Label(1:32));
 
 %% fft and anova method
-norm_rs_alpha = buildPowerTable(All_Subjects, fs, {'tRNS', 'tACS', 'tACS'});
+norm_rs_alpha = buildPowerTable(All_Subjects, fs, {'tRNS', 'tACS', 'tACS'}, ch32Locations);
 [aov_results, signif_chans] = rsPowerAOV(norm_rs_alpha);
-plot_chan = map_chan(["C3", "C4"]);
+plot_chan = map_chan(["C3", "C4", "FZ", "FC2"]);
 createPowerBarPlot(norm_rs_alpha, plot_chan);
 createTopoplots(norm_rs_alpha, ch32Locations);
 
 
 %% Method using fft and two-way anova (from paper)
 
-function rs_alpha_power = buildPowerTable(subjects, fs, treatment_labels)
+function rs_alpha_power = buildPowerTable(subjects, fs, treatment_labels, ch32Locations)
     n_sub = length(subjects);
     sessions = {'Pre', 'Post'};
     n_sess = length(sessions);
@@ -41,7 +41,7 @@ function rs_alpha_power = buildPowerTable(subjects, fs, treatment_labels)
             session = sessions{sess};
             period = getfield(subjects, {sub}, session, 'restingState', 'run', 'eeg');
             period = trimRun(period, n_chan);
-            [pxx, ~] = pwelch(period(10*fs:end-10*fs,:), fs, fs/2, 1:50, fs);
+            [pxx, f] = pwelch(period(10*fs:end-10*fs,:), fs, fs/2, 1:50, fs);
             mean_alpha_powers = sum(pxx(8:12, :), 1);
             element = (sub-1)*n_sess + sess;
             segment_means(element, :) = mean_alpha_powers;
@@ -50,6 +50,7 @@ function rs_alpha_power = buildPowerTable(subjects, fs, treatment_labels)
         end
     end
     rs_alpha_power = struct('values', segment_means, 'treatment', {treatment}, 'time', {time});
+    createTopoplots(rs_alpha_power, ch32Locations);
     rs_alpha_power = normalizeAlphaPower(rs_alpha_power);
 end
 
@@ -76,74 +77,85 @@ function power_struct = normalizeAlphaPower(power_struct)
     Pre = cellfun(@(m)isequal(m,"Pre"),power_struct.time);
     Post = cellfun(@(m)isequal(m,"Post"),power_struct.time);
     pre_powers = power_struct.values(Pre, :);
-    power_struct.values(Post,:) = power_struct.values(Post,:)./pre_powers.*100;
+    power_struct.values(Post,:) = (power_struct.values(Post,:)-power_struct.values(Pre,:))./pre_powers.*100;
     power_struct.values(Pre,:) = power_struct.values(Pre,:)./pre_powers.*100;
 end
 
 
+% function createPowerBarPlot(power_struct, chan_num)
+%     treatments = ["tRNS", "tACS"];
+%     n_treat = length(treatments);
+%     for ch = 1:length(chan_num)
+%         chan = chan_num(ch);
+%         figure(ch);
+%         ax = gobjects(n_treat, 1);
+%         for treat = 1:n_treat
+%             treatment = treatments(treat);
+%             ax(treat) = subplot(1, 2, treat);
+%             treatmentselect = cellfun(@(m)isequal(m,treatment),power_struct.treatment);
+%             preselect = cellfun(@(m)isequal(m,"Pre"),power_struct.time);
+%             postselect = cellfun(@(m)isequal(m,"Post"),power_struct.time);
+%             pre = squeeze(power_struct.values(treatmentselect & preselect, chan));
+%             post = squeeze(power_struct.values(treatmentselect & postselect, chan));
+%             means = [mean(pre), mean(post)];
+%             sems = [std(pre)/sqrt(length(pre)), std(post)/sqrt(length(post))];
+%             xlab = categorical({'Pre', 'Post'});
+%             xlab = reordercats(xlab,{'Pre', 'Post'});
+%             r = bar(xlab(1), means(1), 'FaceColor','r');
+%             hold on
+%             o = bar(xlab(2), means(2), 'FaceColor','g');
+%             errorbar(r.XEndPoints,means(1), sems(1),'LineStyle','none','Color','k','LineWidth',2)
+%             errorbar(o.XEndPoints,means(2), sems(2),'LineStyle','none','Color','k','LineWidth',2)
+%             xlabel(treatment);
+%             ylabel("Alpha Band Power (%)")
+%             axis(ax(treat), 'tight')
+%         end
+%         sgtitle("Relative Alpha Power at " + map_chan(chan))
+%         linkaxes(ax, 'y')
+%         hold off
+%     end
+% end
 function createPowerBarPlot(power_struct, chan_num)
-    treatments = ["tRNS", "tACS"];
-    n_treat = length(treatments);
+    tACSselect = cellfun(@(m)isequal(m,"tACS"),power_struct.treatment);
+    tRNSselect = cellfun(@(m)isequal(m,"tRNS"),power_struct.treatment);
+    postselect = cellfun(@(m)isequal(m,"Post"),power_struct.time);
+    post_tRNS = power_struct.values(tRNSselect & postselect, chan_num);
+    post_tACS = power_struct.values(tACSselect & postselect, chan_num);
+    means = [mean(post_tRNS, 1); mean(post_tACS, 1)];
+    sems = [std(post_tRNS, 0, 1)/sqrt(size(post_tACS, 1)); std(post_tACS, 0, 1)/sqrt(size(post_tACS, 1))];
+    xlab = categorical({'tRNS', 'tACS'});
+    xlab = reordercats(xlab,{'tRNS', 'tACS'});
+    h = bar(xlab, means);
+    hold on
     for ch = 1:length(chan_num)
-        chan = chan_num(ch);
-        figure(ch);
-        ax = gobjects(n_treat, 1);
-        for treat = 1:n_treat
-            treatment = treatments(treat);
-            ax(treat) = subplot(1, 2, treat);
-            treatmentselect = cellfun(@(m)isequal(m,treatment),power_struct.treatment);
-            preselect = cellfun(@(m)isequal(m,"Pre"),power_struct.time);
-            postselect = cellfun(@(m)isequal(m,"Post"),power_struct.time);
-            pre = squeeze(power_struct.values(treatmentselect & preselect, chan));
-            post = squeeze(power_struct.values(treatmentselect & postselect, chan));
-            means = [mean(pre), mean(post)];
-            sems = [std(pre)/sqrt(length(pre)), std(post)/sqrt(length(post))];
-            xlab = categorical({'Pre', 'Post'});
-            xlab = reordercats(xlab,{'Pre', 'Post'});
-            r = bar(xlab(1), means(1), 'FaceColor','r');
-            hold on
-            o = bar(xlab(2), means(2), 'FaceColor','g');
-            errorbar(r.XEndPoints,means(1), sems(1),'LineStyle','none','Color','k','LineWidth',2)
-            errorbar(o.XEndPoints,means(2), sems(2),'LineStyle','none','Color','k','LineWidth',2)
-            xlabel(treatment);
-            ylabel("Alpha Band Power (%)")
-            axis(ax(treat), 'tight')
-        end
-        sgtitle("Relative Alpha Power at " + map_chan(chan))
-        linkaxes(ax, 'y')
-        hold off
+        errorbar(h(ch).XEndPoints, means(:, ch), sems(:, ch),'LineStyle','none','Color','k','LineWidth',2)
     end
+    legend(h, map_chan(chan_num), 'FontSize',13);
+    ylabel("Alpha Power Change (%)", 'FontSize', 13)
 end
 
 function createTopoplots(power_struct, ch32Locations)
     tRNSselect = cellfun(@(m)isequal(m,"tRNS"),power_struct.treatment);
     tACSselect = cellfun(@(m)isequal(m,"tACS"),power_struct.treatment);
-    preselect = cellfun(@(m)isequal(m,"Pre"),power_struct.time);
     postselect = cellfun(@(m)isequal(m,"Post"),power_struct.time);
-    maplim = [50 200];
+    maplim = [-20 120];
     figure();
-    t = tiledlayout(1,4, 'TileSpacing','compact');
-    nexttile;
-    pre_tRNS = mean(power_struct.values(tRNSselect & preselect, :), 1);
-    topoplot(pre_tRNS, ch32Locations, 'maplimits', maplim);
-    title("Pre tRNS", "FontSize",13)
+    t = tiledlayout(1,2, 'TileSpacing','compact');
     nexttile;
     post_tRNS = mean(power_struct.values(tRNSselect & postselect, :), 1);
     topoplot(post_tRNS, ch32Locations, 'maplimits', maplim);
     title("Post tRNS", "FontSize",13)
-    nexttile;
-    pre_tACS = mean(power_struct.values(tACSselect & preselect, :), 1);
-    topoplot(pre_tACS, ch32Locations, 'maplimits', maplim);
-    title("Pre tACS", "FontSize",13)
     nexttile;
     post_tACS = mean(power_struct.values(tACSselect & postselect, :), 1);
     topoplot(post_tACS, ch32Locations, 'maplimits', maplim);
     title("Post tACS", "FontSize",13)
     cb = colorbar('Limits', maplim);
     cb.Layout.Tile = 'south';
-    xlabel(t, "Power Change (%)");
+    xlabel(t, "Alpha Power Change (%)");
+    hold off
 end
 
+    
 
 function chan_output = map_chan(chan_input)
     global chan_map
