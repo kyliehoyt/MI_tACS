@@ -29,6 +29,15 @@ C4 = map_chan("C4");
 [C3_baselines, C3_alpha_power, ~, ~] = fitBaselines(ffts, f, D, C3, [7, 7; 4, 4; 7, 7], [29, 29; 32, 30; 25, 28]);
 [C4_baselines, C4_alpha_power, ~, ~] = fitBaselines(ffts, f, D, C4, [8, 8; 3, 5; 7, 7], [28, 30; 32, 32; 25, 25]);
 
+%% Statistical Analysis of BCI Perf Metrics
+% Compute statistical significance of CDA and TO pre- and post- stimulation
+pre = 1; post = 2;
+Pcda = evalBciPerfSignificance(all_perf(:,:,pre), all_perf(:,:,post));
+Pto = evalBciPerfSignificance(all_to(:,:,pre), all_to(:,:,post));
+
+% Compute Pearson correlation between CDA and Absolute Alpha Power of C3 and C4 features
+rC3 = corrAlphaAndCDA(C3_alpha_power, all_perf, "C3");
+rC4 = corrAlphaAndCDA(C4_alpha_power, all_perf, "C4");
 
 %% Functions for Performance
 function [accuracy, timeout_rate] = compute_performance(subjects, fs)
@@ -36,7 +45,7 @@ function [accuracy, timeout_rate] = compute_performance(subjects, fs)
     sessions = ["Pre", "Post"];
     n_sess = length(sessions);
     n_run = 3;
-    [accuracy, timeout_rate] = deal(zeros(n_sub, n_sess, n_run));
+    [accuracy, timeout_rate] = deal(zeros(n_sub, n_run, n_sess));
     for sub = 1:n_sub
         for sess = 1:n_sess
             session = sessions(sess);
@@ -56,8 +65,8 @@ function [accuracy, timeout_rate] = compute_performance(subjects, fs)
                         n_to = n_to+1;
                     end
                 end
-                accuracy(sub, sess, run) = n_hit/(n_hit+n_miss);
-                timeout_rate(sub, sess, run) = n_to/length(trial_outcome);
+                accuracy(sub, run, sess) = n_hit/(n_hit+n_miss);
+                timeout_rate(sub, run, sess) = n_to/length(trial_outcome);
             end
         end
     end
@@ -169,7 +178,39 @@ end
 
 % function to see if there is a statistically significant difference in CDA and TO before and after
 % tACS
+function P = evalBciPerfSignificance(pre, post)
+    P = zeros(2,1);
+    tRNSPre = pre(1,:);
+    tACSPre = pre(2:3,:);
+    tRNSPost = post(1,:);
+    tACSPost = post(2:3,:);
 
+    [h, P(1)] = ttest2(tRNSPre, tRNSPost); 
+    [h, P(2)] = ttest2(tACSPre(:), tACSPost(:));
+end
 
 % function to compute correlation absolute alpha power and CDA
+function r = corrAlphaAndCDA(absolute_alpha_power, accuracy, ch_label)
+    n_sub = 3;
+    n_sess = 2;
+    n_run = 3;
+    session_accuracy = zeros(n_sub, n_sess);
+
+    for sub = 1:n_sub
+        for sess = 1:n_sess
+            session_accuracy(sub, sess) = sum(accuracy(sub,:,sess))/n_run;        
+        end
+    end
+
+    figure();
+    scatter(absolute_alpha_power(:), session_accuracy(:));
+    hold on
+    plot(fit(absolute_alpha_power(:), session_accuracy(:), 'poly1'));
+    hold off
+    xlabel("Absolute Alpha Power");
+    ylabel("Command Delivery Accuracy");
+    title(sprintf("CDA vs Absolute Alpha Power of %s", ch_label));
+
+    r = corrcoef(absolute_alpha_power, session_accuracy);
+end
 
