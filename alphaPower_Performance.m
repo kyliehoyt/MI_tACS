@@ -1,5 +1,5 @@
 clear
-%close all
+close all
 clc
 
 %% Load Subject Data
@@ -19,6 +19,7 @@ All_Subjects = cleanSubjects(All_Subjects, fs, 0, [1 100]);
 
 %% Compute Performance Metrics
 [all_perf,all_to] = compute_performance(All_Subjects, fs);
+create_bar_plot(all_perf)
 
 %% Compute Absolute Alpha Power
 [ffts, f] = getSubjectFFTs(All_Subjects, fs);
@@ -70,6 +71,31 @@ function [accuracy, timeout_rate] = compute_performance(subjects, fs)
             end
         end
     end
+end
+
+function create_bar_plot(data)
+    avg_data = squeeze(mean(data, 2));
+    sem_data = std(data, 0, 2)/sqrt(size(data, 2));
+    xlab = categorical({'Pre', 'Post'});
+    xlab = reordercats(xlab,{'Pre', 'Post'});
+    h=bar(xlab, avg_data');
+    hold on
+    errorbar(h(1).XEndPoints,avg_data(1, :),sem_data(1, :),'LineStyle','none','Color','k','LineWidth',2)
+    errorbar(h(2).XEndPoints,avg_data(2, :),sem_data(2, :),'LineStyle','none','Color','k','LineWidth',2)
+    errorbar(h(3).XEndPoints,avg_data(3, :),sem_data(3, :),'LineStyle','none','Color','k','LineWidth',2)
+    for sub = 1:3
+        for s = 1:2
+            scatter(repmat(h(sub).XEndPoints(s), 3, 1), squeeze(data(sub,:, s)) ...
+            ,10,'MarkerFaceColor', h(sub).FaceColor, 'MarkerEdgeColor','k','LineWidth' ...
+            ,1,'XJitter','randn','XJitterWidth',.05)
+        end
+    end
+    leg = legend(h, ["Sub 12 - tRNS" "Sub 16 - tACS" "Sub 17 - tACS"]);
+    leg.FontSize = 11;
+    ylabel("Command Delivery Accuracy", 'FontSize',13)
+    xlabel("Session", "FontSize",13)
+    ax = gca;
+    ax.FontSize = 11;
 end
 
 function plotFFT_dB(f, fft_dB)
@@ -203,14 +229,20 @@ function r = corrAlphaAndCDA(absolute_alpha_power, accuracy, ch_label)
     end
 
     figure();
-    scatter(absolute_alpha_power(:), session_accuracy(:));
+    scatter(absolute_alpha_power(:), session_accuracy(:), 40, 'blue', 'filled');
     hold on
-    plot(fit(absolute_alpha_power(:), session_accuracy(:), 'poly1'));
+    line = plot(fit(absolute_alpha_power(:), session_accuracy(:), 'poly1'));
+    line.LineWidth = 2;
+    line.LineStyle = '--';
     hold off
-    xlabel("Absolute Alpha Power");
-    ylabel("Command Delivery Accuracy");
-    title(sprintf("CDA vs Absolute Alpha Power of %s", ch_label));
+    xlabel("Absolute Alpha Power (dB)", 'Fontsize', 13);
+    ylabel("Command Delivery Accuracy", 'Fontsize', 13);
+    title(sprintf("CDA vs Absolute Alpha Power of %s", ch_label), 'Fontsize', 14);
+    ax = gca;
+    ax.FontSize = 11;
 
     r = corrcoef(absolute_alpha_power, session_accuracy);
+    l = legend("", strcat("r = ", string(r(1, 2))));
+    l.FontSize = 11;
 end
 
