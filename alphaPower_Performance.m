@@ -37,8 +37,8 @@ Pcda = evalBciPerfSignificance(all_perf(:,:,pre), all_perf(:,:,post));
 Pto = evalBciPerfSignificance(all_to(:,:,pre), all_to(:,:,post));
 
 % Compute Pearson correlation between CDA and Absolute Alpha Power of C3 and C4 features
-rC3 = corrAlphaAndCDA(C3_alpha_power, all_perf, "C3");
-rC4 = corrAlphaAndCDA(C4_alpha_power, all_perf, "C4");
+[rC3, pC3] = corrAlphaAndCDA(C3_alpha_power, all_perf, "C3");
+[rC4, pC4] = corrAlphaAndCDA(C4_alpha_power, all_perf, "C4");
 
 %% Functions for Performance
 function [accuracy, timeout_rate] = compute_performance(subjects, fs)
@@ -137,7 +137,7 @@ function [baselines, absolute_alpha_power, lower_a, upper_b] = fitBaselines(ffts
     subject_names = ["12", "16", "17"];
     for sub = 1:n_sub
         figure();
-        ax = subplot(1, 2, 1);
+        h = zeros(2,1);
         for sess = 1:n_sess
             hold off
             session = sessions{sess};
@@ -163,18 +163,23 @@ function [baselines, absolute_alpha_power, lower_a, upper_b] = fitBaselines(ffts
             baseline_at_peak = fitobject(idx+lower_a(sub, sess)-1);
             absolute_alpha_power(sub, sess) = alpha_peak - baseline_at_peak;
             % plot
-            subplot(ax);
-            subplot(1, 2, sess);
-            plot(fitobject, f, ch_fft);
+            h(sess) = subplot(1, 2, sess);
+            ax = gca;
+            lines = plot(fitobject,f, ch_fft);
+            set(lines(2), 'LineWidth', 1.5);
             hold on
             xlin(idx+lower_a(sub, sess)-1, string(absolute_alpha_power(sub, sess)), baseline_at_peak, alpha_peak, alpha_peak);
-            title(session + " Stimulation")
-            xlabel("f (Hz)")
-            ylabel("Power (dB)")
+            title(ax, session + " Stimulation", 'FontSize', 13)
+            xlabel(ax, "Frequency (Hz)", "FontSize", 13)
+            ylabel(ax, "Power (dB)", "FontSize", 13)
             xlim([0 50])
-            legend({'PSD', 'Baseline'})
+            ax.FontSize = 11;
+            leg = legend({'PSD', 'Baseline'});
+            leg.FontSize = 11;
         end
-        sgtitle(map_chan(ch_num) + " PSD and Baseline Noise of Subject " + subject_names(sub))
+        linkaxes(h, 'xy');
+        ylim('auto')
+        sgtitle(map_chan(ch_num) + " PSD and Baseline Noise of Subject " + subject_names(sub), 'FontSize', 14)
     end
 end
 
@@ -211,12 +216,12 @@ function P = evalBciPerfSignificance(pre, post)
     tRNSPost = post(1,:);
     tACSPost = post(2:3,:);
 
-    [h, P(1)] = ttest2(tRNSPre, tRNSPost); 
-    [h, P(2)] = ttest2(tACSPre(:), tACSPost(:));
+    [~, P(1)] = ttest2(tRNSPre, tRNSPost); 
+    [~, P(2)] = ttest2(tACSPre(:), tACSPost(:));
 end
 
 % function to compute correlation absolute alpha power and CDA
-function r = corrAlphaAndCDA(absolute_alpha_power, accuracy, ch_label)
+function [r, p] = corrAlphaAndCDA(absolute_alpha_power, accuracy, ch_label)
     n_sub = 3;
     n_sess = 2;
     n_run = 3;
@@ -241,8 +246,8 @@ function r = corrAlphaAndCDA(absolute_alpha_power, accuracy, ch_label)
     ax = gca;
     ax.FontSize = 11;
 
-    r = corrcoef(absolute_alpha_power, session_accuracy);
-    l = legend("", strcat("r = ", string(r(1, 2))));
-    l.FontSize = 11;
+    [R, P] = corrcoef(absolute_alpha_power, session_accuracy);
+    r = R(1, 2);
+    p = P(1, 2);
 end
 
