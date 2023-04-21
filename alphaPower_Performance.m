@@ -18,8 +18,10 @@ All_Subjects = [Subject_12, Subject_16, Subject_17];
 All_Subjects = cleanSubjects(All_Subjects, fs, 0, [1 100]);
 
 %% Compute Performance Metrics
-[all_perf,all_to] = compute_performance(All_Subjects, fs);
-create_bar_plot(all_perf)
+%[all_perf,all_to] = compute_performance(All_Subjects, fs);
+SLA = getSampleLevelAccuracy();
+%create_bar_plot(all_perf)
+create_bar_plot(SLA);
 
 %% Compute Absolute Alpha Power
 [ffts, f] = getSubjectFFTs(All_Subjects, fs);
@@ -33,12 +35,12 @@ C4 = map_chan("C4");
 %% Statistical Analysis of BCI Perf Metrics
 % Compute statistical significance of CDA and TO pre- and post- stimulation
 pre = 1; post = 2;
-Pcda = evalBciPerfSignificance(all_perf(:,:,pre), all_perf(:,:,post));
-Pto = evalBciPerfSignificance(all_to(:,:,pre), all_to(:,:,post));
+PSLA = evalBciPerfSignificance(SLA(:,:,pre), SLA(:,:,post));
+%Pto = evalBciPerfSignificance(all_to(:,:,pre), all_to(:,:,post));
 
-% Compute Pearson correlation between CDA and Absolute Alpha Power of C3 and C4 features
-[rC3, pC3] = corrAlphaAndCDA(C3_alpha_power, all_perf, "C3");
-[rC4, pC4] = corrAlphaAndCDA(C4_alpha_power, all_perf, "C4");
+% Compute Pearson correlation between Performance and Absolute Alpha Power of C3 and C4 features
+[rC3, pC3] = corrAlphaAndPerf(C3_alpha_power, SLA, "C3");
+[rC4, pC4] = corrAlphaAndPerf(C4_alpha_power, SLA, "C4");
 
 %% Functions for Performance
 function [accuracy, timeout_rate] = compute_performance(subjects, fs)
@@ -90,9 +92,9 @@ function create_bar_plot(data)
             ,1,'XJitter','randn','XJitterWidth',.05)
         end
     end
-    leg = legend(h, ["Sub 12 - tRNS" "Sub 16 - tACS" "Sub 17 - tACS"]);
+    leg = legend(h, ["Sub 12 - tRNS" "Sub 16 - tACS" "Sub 17 - tACS"], 'location', 'best');
     leg.FontSize = 11;
-    ylabel("Command Delivery Accuracy", 'FontSize',13)
+    ylabel("Sample Level Accuracy", 'FontSize',13)
     xlabel("Session", "FontSize",13)
     ax = gca;
     ax.FontSize = 11;
@@ -221,17 +223,8 @@ function P = evalBciPerfSignificance(pre, post)
 end
 
 % function to compute correlation absolute alpha power and CDA
-function [r, p] = corrAlphaAndCDA(absolute_alpha_power, accuracy, ch_label)
-    n_sub = 3;
-    n_sess = 2;
-    n_run = 3;
-    session_accuracy = zeros(n_sub, n_sess);
-
-    for sub = 1:n_sub
-        for sess = 1:n_sess
-            session_accuracy(sub, sess) = sum(accuracy(sub,:,sess))/n_run;        
-        end
-    end
+function [r, p] = corrAlphaAndPerf(absolute_alpha_power, accuracy, ch_label)
+    session_accuracy = mean(accuracy, 2);
 
     figure();
     scatter(absolute_alpha_power(:), session_accuracy(:), 40, 'blue', 'filled');
@@ -241,8 +234,8 @@ function [r, p] = corrAlphaAndCDA(absolute_alpha_power, accuracy, ch_label)
     line.LineStyle = '--';
     hold off
     xlabel("Absolute Alpha Power (dB)", 'Fontsize', 13);
-    ylabel("Command Delivery Accuracy", 'Fontsize', 13);
-    title(sprintf("CDA vs Absolute Alpha Power of %s", ch_label), 'Fontsize', 14);
+    ylabel("Sample Level Accuracy", 'Fontsize', 13);
+    title(sprintf("Accuracy vs Absolute Alpha Power of %s", ch_label), 'Fontsize', 14);
     ax = gca;
     ax.FontSize = 11;
 
